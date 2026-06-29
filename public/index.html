@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WhatsApp Web - Aesthetic Teal</title>
-    <!-- Panggil Google Material Icons untuk Logo Telepon & Video Call yang Elegan -->
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
@@ -21,10 +20,14 @@
         #username { background-color: #fff; border: 1px solid #ccc; padding: 6px 12px; border-radius: 6px; color: #111b21; font-size: 14px; outline: none; width: 65%; font-weight: 600; }
         #username:focus { border-color: #008069; }
 
-        .search-bar { padding: 8px 12px; background-color: #fff; border-bottom: 1px solid #f0f2f5; }
-        .search-wrapper { background-color: #f0f2f5; border-radius: 8px; padding: 6px 12px; display: flex; align-items: center; }
+        .search-bar { padding: 8px 12px; background-color: #fff; border-bottom: 1px solid #f0f2f5; display: flex; gap: 8px; align-items: center; }
+        .search-wrapper { background-color: #f0f2f5; border-radius: 8px; padding: 6px 12px; display: flex; align-items: center; flex-grow: 1; }
         .search-wrapper input { width: 100%; background: transparent; border: none; outline: none; font-size: 14px; }
         
+        /* Tombol Tambah Kontak Baru Yang Estetik */
+        .btn-tambah-kontak { background-color: #008069; color: white; border: none; width: 36px; height: 36px; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; transition: 0.2s; }
+        .btn-tambah-kontak:hover { background-color: #006653; transform: scale(1.05); }
+
         /* Daftar Kontak untuk Pindah Ruangan (Grup / Privat) */
         .contact-list { flex-grow: 1; overflow-y: auto; background-color: #fff; }
         .contact-item { display: flex; align-items: center; padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #f0f2f5; transition: 0.2s; }
@@ -90,40 +93,34 @@
 <body>
 
     <div class="app-container">
-        <!-- SIDEBAR KIRI -->
         <div class="sidebar">
             <div class="side-header">
                 <div class="my-profile-container">
-                    <div class="my-avatar">H</div>
+                    <div class="my-avatar" id="my-avatar-letter">H</div>
                     <input type="text" id="username" placeholder="Nama Profil..." value="Hurul" />
                 </div>
             </div>
+            
             <div class="search-bar">
                 <div class="search-wrapper">
                     <input type="text" placeholder="Cari atau mulai chat baru" readonly>
                 </div>
+                <button class="btn-tambah-kontak" onclick="tambahKontakBaru()" title="Tambah Chat Baru">
+                    <span class="material-icons" style="font-size: 20px;">add</span>
+                </button>
             </div>
             
-            <!-- Daftar Kontak (Bisa Dipilih Untuk Private Chat!) -->
-            <div class="contact-list">
-                <div class="contact-item active" id="btn-grup" onclick="gantiRuangan('Grup Pengujian Dosen', 'G')">
+            <div class="contact-list" id="list-kontak">
+                <div class="contact-item active" id="btn-grup" onclick="gantiRuangan('Grup Pengujian Dosen', 'G', 'btn-grup')">
                     <div class="c-avatar" style="background-color: #008069;">G</div>
                     <div class="c-details">
                         <h4>Grup Pengujian Dosen</h4>
                         <p>Ruang Grup Utama</p>
                     </div>
                 </div>
-                <div class="contact-item" id="btn-privat" onclick="gantiRuangan('Aini (Private Chat)', 'A')">
-                    <div class="c-avatar" style="background-color: #1a73e8;">A</div>
-                    <div class="c-details">
-                        <h4>Aini</h4>
-                        <p>Chat Pribadi</p>
-                    </div>
-                </div>
             </div>
         </div>
 
-        <!-- AREA CHAT KANAN -->
         <div class="chat-area">
             <div class="chat-header">
                 <div class="chat-header-left">
@@ -133,7 +130,6 @@
                         <p id="header-status">Online via WebSocket</p>
                     </div>
                 </div>
-                <!-- Menggunakan Google Material Icons Yang Tipis & Tidak Kaku -->
                 <div class="chat-header-icons">
                     <span class="material-icons">videocam</span>
                     <span class="material-icons">call</span>
@@ -157,26 +153,83 @@
         const socket = io();
         const chatbox = document.getElementById('chatbox');
         
+        // Fitur mengubah huruf avatar profil kiri atas secara otomatis saat nama profil diubah
+        const usernameInput = document.getElementById('username');
+        const myAvatarLetter = document.getElementById('my-avatar-letter');
+
+        usernameInput.addEventListener('input', () => {
+            const nama = usernameInput.value.trim();
+            if (nama !== "") {
+                myAvatarLetter.innerText = nama.charAt(0).toUpperCase();
+            } else {
+                myAvatarLetter.innerText = "-";
+            }
+        });
+
+        // Set huruf inisial awal (Hurul -> H) saat pertama kali dimuat
+        if (usernameInput.value.trim() !== "") {
+            myAvatarLetter.innerText = usernameInput.value.trim().charAt(0).toUpperCase();
+        }
+
         // Mengatur ruangan aktif saat ini (Bawaan awal: Grup)
         let ruanganAktif = 'Grup Pengujian Dosen';
+        let totalKontakLokal = 0; 
 
-        // Fungsi berpindah ruangan saat kontak diklik
-        function gantiRuangan(namaRuangan, inisial) {
+        // Fungsi untuk menambah kontak secara langsung tanpa refresh halaman
+        function tambahKontakBaru() {
+            const namaBaru = prompt("Masukkan nama kontak baru untuk Private Chat:");
+            
+            if (namaBaru && namaBaru.trim() !== "") {
+                totalKontakLokal++;
+                const uniqueId = 'btn-dinamis-' + totalKontakLokal;
+                const inisial = namaBaru.charAt(0).toUpperCase();
+
+                // Daftar warna acak estetik untuk avatar kontak baru
+                const warnaAvatar = ['#1a73e8', '#e53935', '#8e24aa', '#f57c00', '#3949ab'];
+                const warnaDipilih = warnaAvatar[totalKontakLokal % warnaAvatar.length];
+
+                const listKontak = document.getElementById('list-kontak');
+                const kontakHtml = `
+                    <div class="contact-item" id="${uniqueId}" onclick="gantiRuangan('${namaBaru.trim()} (Private Chat)', '${inisial}', '${uniqueId}')">
+                        <div class="c-avatar" style="background-color: ${warnaDipilih};">${inisial}</div>
+                        <div class="c-details">
+                            <h4>${namaBaru.trim()}</h4>
+                            <p>Chat Pribadi</p>
+                        </div>
+                    </div>
+                `;
+                listKontak.innerHTML += kontakHtml;
+            }
+        }
+
+        // Fungsi berpindah ruangan dengan sistem seleksi dinamis
+        function gantiRuangan(namaRuangan, inisial, elementId) {
             ruanganAktif = namaRuangan;
             document.getElementById('header-title').innerText = namaRuangan;
             document.getElementById('header-avatar').innerText = inisial;
             
-            // Ubah warna avatar header sesuai pilihan
-            document.getElementById('header-avatar').style.backgroundColor = inisial === 'G' ? '#008069' : '#1a73e8';
+            // Ambil element kontak yang diklik untuk menyalin warna avatarnya ke header
+            const targetElement = document.getElementById(elementId);
+            if (targetElement) {
+                const warnaAvatarAsli = targetElement.querySelector('.c-avatar').style.backgroundColor;
+                document.getElementById('header-avatar').style.backgroundColor = warnaAvatarAsli;
+            }
 
-            // Mengatur efek visual seleksi kontak di kiri
-            if(inisial === 'G') {
-                document.getElementById('btn-grup').classList.add('active');
-                document.getElementById('btn-privat').classList.remove('active');
+            // Hapus status class 'active' dari SEMUA kontak yang ada di sidebar
+            const semuaKontak = document.querySelectorAll('.contact-item');
+            semuaKontak.forEach(kontak => {
+                kontak.classList.remove('active');
+            });
+
+            // Beri warna latar abu-abu aktif ke kontak yang baru saja diklik
+            if (targetElement) {
+                targetElement.classList.add('active');
+            }
+
+            // Atur status bar teks di header chat
+            if (inisial === 'G') {
                 document.getElementById('header-status').innerText = "Hurul, Kawan, Online";
             } else {
-                document.getElementById('btn-grup').classList.remove('active');
-                document.getElementById('btn-privat').classList.add('active');
                 document.getElementById('header-status').innerText = "Online";
             }
 
